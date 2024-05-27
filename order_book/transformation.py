@@ -180,7 +180,7 @@ def get_price_trends(ob_series, horizons=6):
                         
         trends.append(trend)
     
-    return trends
+    return np.array(trends)
             
     
             
@@ -209,7 +209,7 @@ def ob_series_to_vectors(ob_series):
         ob_vectors.append(ob_vector)
         change_vectors.append(change_vector)
         
-    return ob_vectors, change_vectors
+    return np.array(ob_vectors), np.array(change_vectors)
         
        
 def vecs_to_model_input(vecs, obs_per_input, price_trends, horizons):
@@ -230,7 +230,7 @@ def vecs_to_model_input(vecs, obs_per_input, price_trends, horizons):
         x_data.append(x_sample)
         y_data.append(price_trends[i])
         
-    return np.array(x_data), y_data
+    return np.array(x_data), np.array(y_data)
     
         
         
