@@ -25,4 +25,28 @@ def get_seq2seq_model(num_obs, num_orders, horizons, latent_dim):
     ########################################
 
     all_outputs = []
-    encoder_output = keras.layers.Reshape((1, int(encoder_output.shape[1])))(encoder_out
+    encoder_output = keras.layers.Reshape((1, int(encoder_output.shape[1])))(encoder_output)
+    inputs = keras.layers.Concatenate(axis=2)([decoder_input, encoder_output])
+
+    
+    for _ in range(horizons):
+        
+        output, state_h, state_c = decoder_lstm(inputs, initial_state=states)
+
+
+        #### Make Prediction ####
+
+        prediction = decoder_dense(Concatenate(axis=2)([output, encoder_output]))
+        all_outputs.append(prediction)
+        
+        #########################
+        
+        inputs = keras.layers.Concatenate(axis=2)([prediction, encoder_output])
+        states = [state_h, state_c]
+
+        
+    
+    combined_outputs = keras.layers.Concatenate(axis=1)(all_outputs)
+    
+    model = keras.models.Model([encoder_inputs, decoder_input], combined_outputs)
+    return model

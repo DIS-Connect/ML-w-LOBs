@@ -30,6 +30,75 @@ class DataLoader():
        'QuantityUnit', 'Volume', 'VolumeUnit']
 
 
+    """
+    Data Loader Function
+    """
+
+    def get_raw_product_orders(self, deliverystart, deliveryend):
+        
+        folder_name, file_name = self.get_local_file_path(deliverystart, deliveryend)
+        
+        if os.path.isfile(folder_name + file_name):
+            return pd.read_csv(folder_name + file_name)
+        
+        start = deliverystart.strftime('%Y-%m-%dT%H:%M:%SZ')
+        end = deliveryend.strftime('%Y-%m-%dT%H:%M:%SZ')
+        
+        query = f"""
+                SELECT *
+                FROM epex_orderbooks_raw_orders
+                WHERE deliverystart = '{start}' AND deliveryend = '{end}'
+                """
+        
+        
+        database = "etlgluedb-pfncms8nqjjp"
+        order_data =  wr.athena.read_sql_query(query, database)
+        order_data.columns = self.columns
+        
+        self.store_product_orders(order_data)
+        
+        return order_data
+
+
+    def get_market_indices(self, year, month, day):
+        
+        year = str(year)
+        month = str(month) if month > 9 else f"0{month}"
+        day = str(day) if day > 9 else f"0{day}"
+
+        folder_name = f"data/indices/"
+        file_name = f"indices_{year}-{month}-{day}.csv"
+        
+        if os.path.isfile(folder_name + file_name):
+            return pd.read_csv(folder_name + file_name)
+
+        return None
+        folder = "epex-spot-data/de/ic/indices/intraday-indices/"
+        files_in_s3 = [f.key.split(folder + "/")[-1] for f in self.raw_bucket.objects.filter(Prefix=folder).all()]
+        indices_df = None
+        
+        for file in files_in_s3:
+            if f"{year}{month}{day}" in file:
+
+                s3_path = "s3://da-historical-raw-001/" +  file
+                indices_df = pd.read_csv(s3_path, skiprows=1)
+                break
+        
+        if indices_df is None:
+            return None
+        
+        indices_df.to_csv(folder_name + file_name, index=False)
+        return indices_df
+
+
+
+
+    """
+    Helper Functions
+    """
+
+
+
         
     def get_local_file_path(self, deliverystart, deliveryend):
         
@@ -69,31 +138,14 @@ class DataLoader():
         order_data.to_csv(folder_name + file_name, index=False)
         
                 
-        
-    def get_raw_product_orders(self, deliverystart, deliveryend):
-        
-        folder_name, file_name = self.get_local_file_path(deliverystart, deliveryend)
-        
-        if os.path.isfile(folder_name + file_name):
-            return pd.read_csv(folder_name + file_name)
-        
-        start = deliverystart.strftime('%Y-%m-%dT%H:%M:%SZ')
-        end = deliveryend.strftime('%Y-%m-%dT%H:%M:%SZ')
-        
-        query = f"""
-                SELECT *
-                FROM epex_orderbooks_raw_orders
-                WHERE deliverystart = '{start}' AND deliveryend = '{end}'
-                """
-        
-        
-        database = "etlgluedb-pfncms8nqjjp"
-        order_data =  wr.athena.read_sql_query(query, database)
-        order_data.columns = self.columns
-        
-        self.store_product_orders(order_data)
-        
-        return order_data
+
+
+
+
+
+
+
+
 
     
     def get_file_name_for_date(self, year, month, day):
@@ -157,4 +209,6 @@ class DataLoader():
             #print(files_in_s3)
 
             
-        
+
+
+

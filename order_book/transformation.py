@@ -29,6 +29,33 @@ def get_visible_product_ob_at(at : str, m7_market_orders : pd.DataFrame) -> pd.D
 
     return m7_market_orders
 
+
+def transform_ob_to_perc_vector(ob):
+    # [0% - 2%], [2% - 5%],[5% - 10%], [10% - 20%], [20% - 50%], [50% - infty]
+    bids = ob[ob["Side"]== "BUY"]
+    asks = ob[ob["Side"]== "SELL"]
+    
+    price = (bids["Price"].max() + asks["Price"].min()) / 2
+
+
+    # calculate limits
+    bucket_limits = [0.02, 0.05, 0.1, 0.2, 0.5]
+
+    bid_vec = []
+    ask_vec = []
+
+    for limit in bucket_limits:
+        vol_bid = bids[bids["Price"] >= (1 - limit) * price]["Volume"].sum()
+        bid_vec.append(vol_bid)
+    
+        vol_ask = asks[asks["Price"] <= (1 + limit) * price]["Volume"].sum()
+        ask_vec.append(vol_ask)
+
+
+    return price, np.array(bid_vec), np.array(ask_vec)
+
+
+
 def transform_ob_to_tensor(order_book : pd.DataFrame, num_orders):
 
 
