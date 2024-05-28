@@ -14,6 +14,7 @@ warnings.filterwarnings("ignore", category=FutureWarning)
 class DataLoader():
 
     def __init__(self):
+        
         self.s3 = boto3.resource('s3', )
 
         bucket_raw = "da-historical-raw-001"
@@ -94,8 +95,6 @@ class DataLoader():
         
         return order_data
 
-    def set_columns(df):
-        df.columns = self.columns
     
     def get_file_name_for_date(self, year, month, day):
 

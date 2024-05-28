@@ -70,7 +70,6 @@ def transform_ob_to_tensor(order_book : pd.DataFrame, num_orders):
     ask_tensor = np.vstack((asks_price, asks_volume))
     
     return np.array([bid_tensor, ask_tensor])
-    
 
 def to_ob_series_by_ticks(
     order_data,
@@ -115,7 +114,6 @@ def to_ob_series_by_ticks(
         
     return lobs
     
-    
 @typechecked
 def to_ob_series_by_timedelta(
     order_data,
@@ -152,7 +150,6 @@ def to_ob_series_by_timedelta(
         current_time += delta
         
     return lobs
-   
 
 def get_price_trends(ob_series, horizons=6):
     
@@ -182,8 +179,6 @@ def get_price_trends(ob_series, horizons=6):
     
     return np.array(trends)
             
-    
-            
 def ob_series_to_vectors(ob_series):
     
     num_obs = len(ob_series)
@@ -210,7 +205,6 @@ def ob_series_to_vectors(ob_series):
         change_vectors.append(change_vector)
         
     return np.array(ob_vectors), np.array(change_vectors)
-        
        
 def vecs_to_model_input(vecs, obs_per_input, price_trends, horizons):
 
@@ -232,8 +226,6 @@ def vecs_to_model_input(vecs, obs_per_input, price_trends, horizons):
         
     return np.array(x_data), np.array(y_data)
     
-        
-        
 def ob_series_to_model_input(ob_series, obs_per_input, price_trends, trends_per_output):
         
     num_obs = len(ob_series)
@@ -253,3 +245,45 @@ def ob_series_to_model_input(ob_series, obs_per_input, price_trends, trends_per_
         y_data.append(price_trends[i+obs_per_input-1])
         
     return np.array(x_data), np.array(y_data)
+
+
+
+def get_obs_by_ticks(
+    order_data,
+    ticks,
+    start = None,
+    end = None):
+    
+    
+    
+    if start is None:
+        start = order_data["TransactionTime"].min()
+        start = datetime.strptime(start, '%Y-%m-%dT%H:%M:%S.%fZ')
+        start = start.replace(hour=16, minute=0, second=0, microsecond=0)
+        start = start.strftime('%Y-%m-%dT%H:%M:%S')
+        
+    
+    if end is None:
+        end = order_data["DeliveryStart"][0]
+        end = datetime.strptime(end, '%Y-%m-%dT%H:%M:%SZ')
+        end -= timedelta(minutes=10)
+        end = end.strftime('%Y-%m-%dT%H:%M:%S')
+        
+    lobs = []
+        
+    transac_times = np.array(order_data["TransactionTime"])
+    transac_times = transac_times[transac_times >= start]
+    transac_times = transac_times[transac_times < end]
+    transac_times.sort()
+    
+                                 
+    time_steps = transac_times[0::ticks]
+    
+    for i in range(len(time_steps)):
+        
+        curr_str = time_steps[i]
+        ob = get_visible_product_ob_at(curr_str, order_data)
+        if(len(ob) != 0):
+            lobs.append((curr_str, ob))
+        
+    return lobs
