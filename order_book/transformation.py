@@ -59,9 +59,6 @@ def get_time_steps_by_ticks(
     transac_times = np.array(order_data["TransactionTime"])
     transac_times = transac_times[transac_times >= start]
     transac_times = transac_times[transac_times < end]
-    
-    is_sorted = lambda a: np.all(a[:-1] <= a[1:])
-    print(is_sorted(transac_times))
 
     transac_times.sort()
                                  
@@ -134,7 +131,10 @@ def get_exp_ob_vec_by_time_steps(
             max_bid, min_ask, bid_vec, ask_vec = ob_to_exp_vec(ob)
             
             curr_unix = datetime.strptime(curr_str, '%Y-%m-%dT%H:%M:%S.%fZ').timestamp()
-            lobs.append([curr_unix, max_bid, min_ask, bid_vec, ask_vec])
+            # print([curr_unix, max_bid, min_ask, bid_vec, ask_vec])
+            meta_data = [curr_unix, max_bid, min_ask,0,0,0,0,0]
+            
+            lobs.append([meta_data, bid_vec, ask_vec])
         
     return np.array(lobs)
 

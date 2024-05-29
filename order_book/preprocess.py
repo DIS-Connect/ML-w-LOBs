@@ -13,22 +13,24 @@ from order_book.loader import *
 
 def preprocess_obs(
     year,
+    months,
     delivery_start, # tuple (hour, minute)
-    delivery_end,   # tuple (hour, minute)    
+    delivery_end,   # tuple (hour, minute)
     ticks=500
     ):
 
     dl = DataLoader()
 
-    for month in range(1,12 + 1,1):
+    for month in months:
 
         obs_to_save = {}
-        
+
         last_day = calendar.monthrange(year, month)[1]
-        for day in range(1, 3):#last_day + 1, 1):
-    
-            start = datetime(year, month, 1, delivery_start[0], delivery_start[1])
-            end = datetime(year, month, 1, delivery_end[0], delivery_end[1])
+        for day in range(1, last_day + 1, 1):
+            print(f"processing: {year}-{month}-{day}")
+
+            start = datetime(year, month, day, delivery_start[0], delivery_start[1])
+            end = datetime(year, month, day, delivery_end[0], delivery_end[1])
 
             order_data = dl.get_raw_product_orders(start, end)
 
@@ -36,11 +38,10 @@ def preprocess_obs(
 
             ob_vecs = get_exp_ob_vec_by_time_steps(order_data, time_steps)
 
-            
+
             ob_name = f"day_{day}"
             obs_to_save[ob_name] = ob_vecs
-        
-        
+
         file_name = f"{year}-{month}_{delivery_start[0]}:{delivery_start[1]}_{delivery_end[0]}:{delivery_end[1]}.npz"
 
         np.savez_compressed("data/preprocessed/"+file_name, **obs_to_save)
