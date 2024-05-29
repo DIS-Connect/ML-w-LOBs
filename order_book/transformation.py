@@ -3,6 +3,7 @@ from typeguard import typechecked
 from typing import Dict
 import numpy as np
 from datetime import datetime, timedelta
+import matplotlib.pyplot as plt
 
 
 @typechecked
@@ -30,29 +31,163 @@ def get_visible_product_ob_at(at : str, m7_market_orders : pd.DataFrame) -> pd.D
     return m7_market_orders
 
 
-def transform_ob_to_perc_vector(ob):
+
+
+@typechecked
+def get_time_steps_by_ticks(
+    order_data : pd.DataFrame,
+    ticks : int,
+    start = None,
+    end = None):
+    
+    
+    
+    if start is None:
+        start = order_data["TransactionTime"].min()
+        start = datetime.strptime(start, '%Y-%m-%dT%H:%M:%S.%fZ')
+        start = start.replace(hour=16, minute=0, second=0, microsecond=0)
+        start = start.strftime('%Y-%m-%dT%H:%M:%S')
+        
+    
+    if end is None:
+        end = order_data["DeliveryStart"][0]
+        end = datetime.strptime(end, '%Y-%m-%dT%H:%M:%SZ')
+        end -= timedelta(minutes=10)
+        end = end.strftime('%Y-%m-%dT%H:%M:%S')
+        
+        
+    transac_times = np.array(order_data["TransactionTime"])
+    transac_times = transac_times[transac_times >= start]
+    transac_times = transac_times[transac_times < end]
+    
+    is_sorted = lambda a: np.all(a[:-1] <= a[1:])
+    print(is_sorted(transac_times))
+
+    transac_times.sort()
+                                 
+    time_steps = transac_times[0::ticks]
+    return time_steps
+
+
+@typechecked
+def ob_to_exp_vec(ob : pd.DataFrame):
     # [0% - 2%], [2% - 5%],[5% - 10%], [10% - 20%], [20% - 50%], [50% - infty]
     bids = ob[ob["Side"]== "BUY"]
     asks = ob[ob["Side"]== "SELL"]
     
-    price = (bids["Price"].max() + asks["Price"].min()) / 2
+    max_bid = bids["Price"].max()
+    min_ask = asks["Price"].min()
+    mid_price = (max_bid + min_ask) / 2
 
 
     # calculate limits
-    bucket_limits = [0.02, 0.05, 0.1, 0.2, 0.5]
+    bucket_limits = [0.25, 0.5, 1, 2, 4, 8, 16, 99999]
 
-    bid_vec = []
-    ask_vec = []
+    bid_vec = np.zeros(8)
+    ask_vec = np.zeros(8)
 
-    for limit in bucket_limits:
-        vol_bid = bids[bids["Price"] >= (1 - limit) * price]["Volume"].sum()
-        bid_vec.append(vol_bid)
+    for _, row in bids.iterrows():
+        order_price = row["Price"] - mid_price
+        order_volume = row["Volume"]
+
+        bucket = 0
+        for limit in bucket_limits:
+            if order_price > -limit:
+                break
+            else:
+                bucket += 1
+        
+        bid_vec[bucket] += order_volume
+
+
+    for _, row in asks.iterrows():
+        order_price = row["Price"] - mid_price
+        order_volume = row["Volume"]
+
+        bucket = 0
+        for limit in bucket_limits:
+            if order_price < limit:
+                break
+            else:
+                bucket += 1
+        
+        ask_vec[bucket] += order_volume
+
+
+
+    return max_bid, min_ask, np.array(bid_vec), np.array(ask_vec)
+
+
+@typechecked
+def get_exp_ob_vec_by_time_steps(
+    order_data,
+    time_steps):
+
+        
+    lobs = []
+    for i in range(len(time_steps)):
+        
+        curr_str = time_steps[i]
+        ob = get_visible_product_ob_at(curr_str, order_data)
+        if(len(ob) != 0):
+        
+            max_bid, min_ask, bid_vec, ask_vec = ob_to_exp_vec(ob)
+            
+            curr_unix = datetime.strptime(curr_str, '%Y-%m-%dT%H:%M:%S.%fZ').timestamp()
+            lobs.append([curr_unix, max_bid, min_ask, bid_vec, ask_vec])
+        
+    return np.array(lobs)
+
+
+@typechecked
+def plot_ob_vecs(ob_vecs, at : int, num_obs=5, vmax=100):
+
+    data = None
+    max_bids = []
+    min_asks = []
+
+    for i in range(num_obs):
+        bids = ob_vecs[at - i][3][::-1]
+        asks = ob_vecs[at - i][4]
+
+        max_bids.append(ob_vecs[at - i][1])
+        min_asks.append(ob_vecs[at - i][2])
+
+        complete_ob_vec = np.hstack((bids, asks))
+        if data is None:
+            data = complete_ob_vec
+        else:
+            data = np.vstack((data, complete_ob_vec))
+
+    data = data[::-1]
     
-        vol_ask = asks[asks["Price"] <= (1 + limit) * price]["Volume"].sum()
-        ask_vec.append(vol_ask)
+    plt.figure(figsize=(30, 5))
+    plt.imshow(data.T, cmap='hot', interpolation='nearest', origin='lower', vmax=vmax)
+
+    # Adding color bar to show the scale
+    plt.colorbar()
+
+    # Display the heatmap
+    plt.show()
 
 
-    return price, np.array(bid_vec), np.array(ask_vec)
+
+
+    plt.figure(figsize=(15, 5))
+    plt.plot(max_bids, marker='o', linestyle='-', color='b', label='max bids')
+    plt.plot(min_asks, marker='o', linestyle='-', color='r', label='min asks')
+
+
+    plt.legend(fontsize=14)
+
+    # Display the chart
+    plt.show()
+
+
+
+
+
+
 
 
 
@@ -125,6 +260,8 @@ def to_ob_series_by_ticks(
     transac_times = np.array(order_data["TransactionTime"])
     transac_times = transac_times[transac_times >= start]
     transac_times = transac_times[transac_times < end]
+    
+
     transac_times.sort()
     
                                  
