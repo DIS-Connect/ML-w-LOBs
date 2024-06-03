@@ -1,9 +1,6 @@
 import os
 import pandas as pd
 import boto3
-from datetime import datetime, timedelta
-import matplotlib.pyplot as plt
-from ipywidgets import interact, FloatSlider
 from order_book.simulation import *
 from tqdm import tqdm
 import awswrangler as wr
@@ -59,6 +56,8 @@ class DataLoader():
         
         return order_data
 
+    def load_indices(self):
+        return pd.read_csv("data/indices.csv")
 
     def get_market_indices(self, year, month, day):
         
@@ -90,16 +89,26 @@ class DataLoader():
         indices_df.to_csv(folder_name + file_name, index=False)
         return indices_df
 
+    def get_ob_vec_series_for_month(
+            self,
+            year,
+            month,
+            delivery_start,
+            delivery_end):
+        
+        start_hour = delivery_start[0]
+        start_minute = delivery_start[1]
 
+        end_hour = delivery_end[0]
+        end_minute = delivery_end[1]
 
+        order_vecs = np.load(f'data/preprocessed/{year}-{month}_{start_hour}:{start_minute}_{end_hour}:{end_minute}.npz', allow_pickle=True)
+        return order_vecs
 
     """
     Helper Functions
     """
-
-
-
-        
+       
     def get_local_file_path(self, deliverystart, deliveryend):
         
         minute_start = deliverystart.strftime("%M")

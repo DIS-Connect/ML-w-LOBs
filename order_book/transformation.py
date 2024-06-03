@@ -31,16 +31,12 @@ def get_visible_product_ob_at(at : str, m7_market_orders : pd.DataFrame) -> pd.D
     return m7_market_orders
 
 
-
-
 @typechecked
 def get_time_steps_by_ticks(
     order_data : pd.DataFrame,
     ticks : int,
     start = None,
     end = None):
-    
-    
     
     if start is None:
         start = order_data["TransactionTime"].min()
@@ -145,13 +141,20 @@ def plot_ob_vecs(ob_vecs, at : int, num_obs=5, vmax=100):
     data = None
     max_bids = []
     min_asks = []
+    price = []
 
     for i in range(num_obs):
-        bids = ob_vecs[at - i][3][::-1]
-        asks = ob_vecs[at - i][4]
+        vec = ob_vecs[at - i]
+        
+        
+        max_bids.append(vec[0][1])
+        min_asks.append(vec[0][2])
+        price.append((vec[0][1] + vec[0][2])/2)
 
-        max_bids.append(ob_vecs[at - i][1])
-        min_asks.append(ob_vecs[at - i][2])
+
+        bids = vec[1][::-1]
+        asks = vec[2]
+
 
         complete_ob_vec = np.hstack((bids, asks))
         if data is None:
@@ -163,19 +166,14 @@ def plot_ob_vecs(ob_vecs, at : int, num_obs=5, vmax=100):
     
     plt.figure(figsize=(30, 5))
     plt.imshow(data.T, cmap='hot', interpolation='nearest', origin='lower', vmax=vmax)
-
-    # Adding color bar to show the scale
     plt.colorbar()
-
-    # Display the heatmap
     plt.show()
-
-
 
 
     plt.figure(figsize=(15, 5))
     plt.plot(max_bids, marker='o', linestyle='-', color='b', label='max bids')
     plt.plot(min_asks, marker='o', linestyle='-', color='r', label='min asks')
+    plt.plot(price, marker='o', linestyle='-', color='g', label='price')
 
 
     plt.legend(fontsize=14)
@@ -184,8 +182,76 @@ def plot_ob_vecs(ob_vecs, at : int, num_obs=5, vmax=100):
     plt.show()
 
 
+@typechecked
+def get_price_trends(ob_vecs):
+
+    trends = []
+    num_obs = len(ob_vecs)
+
+    # initialize first vector with [0,1,0]
+    trends.append([0,1,0])
+
+    for i in range(num_obs-1):
+        past_max_bid = ob_vecs[i][0][1]
+        past_min_ask = ob_vecs[i][0][2]
+
+        curr_max_bid = ob_vecs[i+1][0][1]
+        curr_min_ask = ob_vecs[i+1][0][2]
 
 
+        if past_min_ask < curr_max_bid:
+            trends.append([1,0,0])
+        elif curr_min_ask < past_max_bid:
+            trends.append([0,0,1])
+        else:
+            trends.append([0,1,0])
+
+    return np.array(trends)
+
+
+@typechecked
+def prepare_seq2seq_model_input(
+    ob_vecs,
+    trends, 
+    num_obs_per_image= 10,
+    horizons = 5):
+
+
+    encoder_input = []
+    decoder_input = []
+    decoder_outout = []
+
+    series_length = len(ob_vecs)
+    for t in range(series_length - horizons - num_obs_per_image + 1):
+        
+        ob_image = []
+        for i in range(num_obs_per_image):
+            
+            bids = ob_vecs[t+i][1][::-1]
+            asks = ob_vecs[t+i][2]
+
+            complete_ob_vec = np.hstack((bids, asks))
+            ob_image.append(complete_ob_vec)
+        
+        encoder_input.append(ob_image)
+
+        decoder_input.append(trends[t+num_obs_per_image-1])
+
+        price_trends = []
+        for h in range(horizons):
+            price_trends.append(trends[t+num_obs_per_image+h])
+
+        decoder_outout.append(price_trends)
+    
+    return np.array(encoder_input), np.array(decoder_input), np.array(decoder_outout) 
+
+
+
+
+
+"""
+OLD
+"""
 
 
 
@@ -315,7 +381,7 @@ def to_ob_series_by_timedelta(
         
     return lobs
 
-def get_price_trends(ob_series, horizons=6):
+def get_price_trends_old(ob_series, horizons=6):
     
     trends = []
     num_obs = len(ob_series)
